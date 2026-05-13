@@ -280,9 +280,11 @@ Agent(
 ```
 
 After the Tester returns:
-1. If no bugs — move to Phase 4.5
+1. If no bugs — **automatically proceed to Phase 4.5** (do NOT skip to Phase 5)
 2. If bugs found — spawn a Developer to fix them, then spawn the Tester again
 3. Repeat until tests pass (max 3 rounds, then report to user)
+
+**IMPORTANT**: Phase 4.5 (Full UI Testing) is MANDATORY and must happen before Phase 5 (Delivery). Do NOT deliver to the user until UI testing is complete.
 
 **Failure handling for bug fixes:**
 - Round 1: Send full bug report to Developer
@@ -329,7 +331,8 @@ Agent(
    After the Tester session completes, read `.claude-os/test-report.md` for results.
    ```
 3. **Write "testing_needed"** to `.claude-os/restart_state`
-4. **The Orchestrator will detect this state** and start a Tester session with full UI testing capabilities (Playwright MCP, computer-control MCP, vision-analyzer MCP)
+4. **STOP IMMEDIATELY.** Do NOT start the dev server, do NOT run any tests yourself, do NOT do any further work. The Orchestrator will kill your process to start the Tester session — any work after writing `testing_needed` will be wasted.
+5. **The Orchestrator will detect this state** and start a Tester session with full UI testing capabilities (Playwright MCP, computer-control MCP, vision-analyzer MCP)
 
 **Do NOT proceed to Phase 5 until the Tester session completes.**
 
