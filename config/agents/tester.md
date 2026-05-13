@@ -103,6 +103,23 @@ If the project is a web application with a running dev server, use the Playwrigh
 - Responsive behavior (if applicable — navigate with different viewport sizes)
 - Error states display appropriate messages
 
+**Visual quality checklist (MANDATORY — use vision-analyzer for each page):**
+
+For EVERY page, take a screenshot and use vision-analyzer with this prompt pattern:
+```
+"Evaluate this web page's visual design quality. Check for: 1) Is text readable? Are font sizes adequate (body text ≥ 14px equivalent)? 2) Is there sufficient contrast between text and background? 3) Are headings visually distinct from body text? 4) Is spacing consistent — no cramped or overlapping elements? 5) Are buttons and interactive elements clearly identifiable? 6) Does the overall layout look professional, or does it look broken/unfinished? Rate each point PASS or FAIL."
+```
+
+**Automatic FAIL conditions (report as High severity bugs):**
+- Body text is too small to read comfortably
+- Text blends into background (poor contrast)
+- Elements overlap each other in unintended ways
+- Large empty/white sections with no content (broken layout)
+- Images are missing, broken, or stretched
+- Buttons/links are invisible or indistinguishable from plain text
+- Pages look significantly different from each other in style (inconsistent design)
+- Mobile viewport shows broken layout (elements off-screen, horizontal scroll)
+
 **Important notes:**
 - `browser_snapshot` returns a **text representation** of the page (accessibility tree), not a screenshot. You can verify text content, element roles, and page structure without image recognition.
 - Use `browser_evaluate` to run JavaScript for checking things not visible in the accessibility tree (e.g., `document.title`, `window.location.href`, computed styles).

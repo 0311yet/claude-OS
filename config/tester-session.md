@@ -58,6 +58,74 @@ For EACH feature described in the PRD:
 4. **Record pass/fail with evidence** — note which verification method was used
 5. **Document findings** — build the test report incrementally
 
+## Visual Quality Audit (MANDATORY)
+
+**This is NOT optional.** After functional testing, perform a dedicated visual quality review of EVERY page.
+
+### Step 1: Screenshot every unique page
+
+Navigate to each page, take a full-page screenshot. Pages to cover:
+- Homepage
+- Each category/listing page
+- Article/item detail page
+- All static pages (about, contact, privacy, terms, etc.)
+- Admin pages (login, dashboard)
+- Mobile viewport (375x812) of the above
+
+### Step 2: Analyze each screenshot with vision-analyzer
+
+Use this prompt for EVERY screenshot:
+
+```
+"Strictly evaluate this web page's visual design quality. Rate each criterion PASS or FAIL:
+
+1. READABILITY: Is body text readable? Adequate font size, line height, no wall-of-text?
+2. CONTRAST: Is there sufficient contrast between text and background? No light-gray-on-white or similar issues?
+3. HIERARCHY: Are headings visually distinct from body? Does the page have clear visual hierarchy?
+4. SPACING: Is spacing consistent? No cramped elements, no unintended overlaps, no excessive gaps?
+5. ALIGNMENT: Are elements properly aligned? Nothing visually off-center or misaligned?
+6. COMPLETENESS: Does the page look finished? No placeholder text, no broken images, no empty sections that should have content?
+7. NAVIGATION: Is the navigation clear and usable? Can users easily find what they're looking for?
+8. PROFESSIONALISM: Does this page look like a production-quality website, or does it look like an unfinished prototype?
+
+For each FAIL, explain specifically what's wrong and suggest a fix."
+```
+
+### Step 3: Automatic FAIL conditions
+
+Report these as **High severity** visual bugs:
+
+| Issue | Severity |
+|-------|----------|
+| Body text too small to read comfortably (< 14px equivalent) | High |
+| Poor text-background contrast (light on light, dark on dark) | High |
+| Unintended element overlap | High |
+| Large empty sections with no content (broken layout) | High |
+| Broken/missing images or icons | Medium |
+| Buttons/links invisible or indistinguishable from text | High |
+| Inconsistent design between pages (different fonts, colors, spacing) | Medium |
+| Mobile layout broken (horizontal scroll, elements off-screen) | High |
+| Placeholder/lorem ipsum text visible | High |
+| Looks like an unfinished prototype, not a real website | High |
+
+### Step 4: Compile visual quality score
+
+In the test report, include a dedicated section:
+
+```markdown
+## Visual Quality Assessment
+
+### Per-Page Scores
+| Page | Desktop Score | Mobile Score | Key Issues |
+|------|--------------|-------------|------------|
+| Homepage | PASS/FAIL | PASS/FAIL | {issues} |
+| ... | ... | ... | ... |
+
+### Overall Visual Quality: USABLE / NEEDS WORK / UNUSABLE
+
+{Summary of whether this application's UI is ready for real users}
+```
+
 **Example testing pattern for a web feature:**
 ```bash
 # Navigate to feature page
