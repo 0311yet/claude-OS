@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import orchestrator; print\\('Import OK'\\)\")",
+      "Bash(npx --version)",
+      "Bash(python3 *)",
+      "Bash(claude mcp *)",
+      "Bash(xargs grep *)",
+      "Bash(xargs cat *)",
+      "Bash(reg query *)",
+      "Bash(env)",
+      "Bash(where claude *)",
+      "Bash(npm list *)",
+      "Bash(npm config *)",
+      "WebSearch",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('orchestrator.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python -m py_compile orchestrator.py)",
+      "Bash(python -c \"import json; json.load\\(open\\('config/mcp.json'\\)\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('orchestrator.py', doraise=True\\); print\\('orchestrator.py: OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('config/mcp_servers/vision-analyzer/server.py', doraise=True\\); print\\('vision-analyzer server.py: OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('config/mcp_servers/computer-control/server.py', doraise=True\\); print\\('computer-control server.py: OK'\\)\")",
+      "Bash(python -c \"import json; json.load\\(open\\('config/mcp.json'\\)\\); print\\('mcp.json: OK'\\)\")",
+      "Bash(python -c \"import json; json.load\\(open\\('config/secrets.example.json'\\)\\); print\\('secrets.example.json: OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('orchestrator.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(python -m py_compile server.py providers/openai_provider.py providers/gemini_provider.py providers/zhipu_provider.py)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('config/mcp_servers/vision-analyzer/server.py', doraise=True\\); print\\('vision-analyzer: OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('config/mcp_servers/computer-control/server.py', doraise=True\\); print\\('computer-control: OK'\\)\")"
+    ]
+  }
+}

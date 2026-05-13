@@ -1,0 +1,10 @@
+# Auto-managed by ClaudeOS — safe to add your own entries below
+.claude-os/restart_state
+.claude-os/recovery.md
+.claude-os/log.md
+.claude/CLAUDE.md.bak
+.claude/settings.json
+config/secrets.json
+node_modules/
+__pycache__/
+.env

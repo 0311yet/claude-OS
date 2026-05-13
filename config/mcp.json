@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "cmd",
+      "args": ["/c", "npx", "@playwright/mcp@latest"]
+    },
+    "serpapi": {
+      "command": "node",
+      "args": ["${configDir}/mcp_servers/serpapi/index.js"],
+      "env": {
+        "SERPAPI_API_KEY": "${secrets.SERPAPI_API_KEY}"
+      }
+    },
+    "vision-analyzer": {
+      "command": "python",
+      "args": ["${configDir}/mcp_servers/vision-analyzer/server.py"],
+      "env": {
+        "VISION_PROVIDER": "${secrets.VISION_PROVIDER}",
+        "VISION_API_KEY": "${secrets.VISION_API_KEY}",
+        "VISION_MODEL": "${secrets.VISION_MODEL}",
+        "WORKSPACE_DIR": "${workspaceDir}"
+      }
+    },
+    "computer-control": {
+      "command": "python",
+      "args": ["${configDir}/mcp_servers/computer-control/server.py"],
+      "env": {
+        "WORKSPACE_DIR": "${workspaceDir}"
+      }
+    }
+  }
+}
