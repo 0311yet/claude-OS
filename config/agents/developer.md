@@ -68,6 +68,19 @@ Forbidden:
 
 ## Task Execution
 
+### Step 0: Python venv (if applicable)
+
+If the project uses Python:
+1. Check if `venv/` or `.venv/` already exists in the workspace root
+2. If NOT, create it: `python -m venv venv`
+3. Activate it before installing any deps or running Python:
+   - Windows: `venv\Scripts\activate && ...`
+   - Linux/Mac: `source venv/bin/activate && ...`
+4. Install pip dependencies into the venv, not globally
+5. Add `venv/` to `.gitignore` if not already present
+
+**Never `pip install` globally** — always use the project venv.
+
 ### Step 1: Mark task as in_progress
 
 Before writing any code, update `.claude-os/tasklist.md`:

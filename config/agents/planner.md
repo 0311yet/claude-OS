@@ -57,6 +57,7 @@ Date: {date}
 7. **Aim for 10-20 tasks** total — not too granular, not too coarse
 8. **Include test tasks** — at least one task per feature for writing tests
 9. **Include a README or documentation task** if appropriate
+10. **Python projects must include a venv setup task** — the very first setup task should create a virtual environment (`python -m venv venv`) and add `venv/` to `.gitignore`. All subsequent pip install tasks must use the venv.
 
 ## Task Writing Guidelines
 
