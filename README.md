@@ -1,6 +1,6 @@
 # ClaudeOS
 
-Multi-agent development framework powered by Claude Code. Orchestrates a team of AI agents (Leader, Planner, Developer, Tester, Auditor) to build complete software projects autonomously.
+Multi-agent development framework powered by Claude Code. Orchestrates a team of AI agents (Leader, Planner, Developer, Tester) to build complete software projects autonomously.
 
 ## How It Works
 
@@ -8,7 +8,6 @@ Multi-agent development framework powered by Claude Code. Orchestrates a team of
 User → Leader → Planner (plan)
                 → Developer (code, parallel)
                 → Tester (test)
-                → Auditor (security audit)
 ```
 
 The **Orchestrator** (Python) manages the Leader's lifecycle — start, monitor, restart on context overflow. The **Leader** (Claude Code) coordinates sub-agents, each spawned as an isolated Claude Code agent with clean context.
@@ -20,9 +19,7 @@ The **Orchestrator** (Python) manages the Leader's lifecycle — start, monitor,
 | 1. Requirements | Leader gathers requirements from user, confirms tech stack |
 | 2. Planning | Planner creates task breakdown with dependencies |
 | 3. Development | Developers implement tasks in parallel (2-3 concurrent) |
-| 3.5. Audit | Auditor performs security & quality review (optional) |
-| 4. Testing | Tester runs automated + manual tests |
-| 4.5. UI Testing | Dedicated Tester session with Playwright/vision tools |
+| 4. Testing | Tester runs automated + manual + browser tests |
 | 5. Delivery | Leader delivers summary to user |
 | 6. Iteration | User requests changes → Developer → Tester loop |
 
@@ -65,25 +62,19 @@ Edit `config/secrets.json`:
 
 ```json
 {
-  "SERPAPI_API_KEY": "",           // Optional: web search
-  "VISION_PROVIDER": "zhipu",     // openai / gemini / zhipu
-  "VISION_API_KEY": "",            // Required for UI testing
-  "VISION_MODEL": "glm-4v-flash"  // Model name
+  "SERPAPI_API_KEY": ""            // Optional: web search
 }
 ```
 
 | Key | Required | Description |
 |-----|----------|-------------|
 | `SERPAPI_API_KEY` | No | SerpAPI for web search MCP |
-| `VISION_API_KEY` | Recommended | Vision analysis for UI testing. [ZhiPu](https://open.bigmodel.cn) glm-4v-flash has free tier |
-| `VISION_PROVIDER` | No | Default `zhipu`. Options: `openai`, `gemini`, `zhipu` |
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAUDEOS_TIMEOUT` | 3600 | Leader session timeout (seconds) |
-| `CLAUDEOS_TESTER_TIMEOUT` | 7200 | Tester session timeout (seconds) |
+| `CLAUDEOS_TIMEOUT` | 5400 | Leader session timeout (seconds) |
 | `CLAUDEOS_HEARTBEAT` | 2400 | Heartbeat check interval (seconds) |
 
 ## Project Structure
@@ -96,20 +87,20 @@ claude-OS/
 ├── requirements.txt             # Python deps (none required at top level)
 ├── config/
 │   ├── leader.md                # Leader agent instructions
-│   ├── tester-session.md        # Tester session instructions (UI testing)
 │   ├── mcp.json                 # MCP server declarations
 │   ├── secrets.json             # API keys (gitignored)
 │   ├── secrets.example.json     # API key template
 │   ├── agents/
 │   │   ├── planner.md           # Task breakdown agent
 │   │   ├── developer.md         # Code implementation agent
-│   │   ├── tester.md            # Testing agent
-│   │   └── auditor.md           # Security audit agent (read-only)
+│   │   └── tester.md            # Testing agent
 │   ├── mcp_servers/
-│   │   ├── serpapi/             # Web search MCP (Node.js)
-│   │   ├── vision-analyzer/     # Visual analysis MCP (Python)
-│   │   │   └── providers/       # OpenAI / Gemini / ZhiPu providers
-│   │   └── computer-control/    # Desktop control MCP (Python, PyAutoGUI)
+│   │   └── serpapi/             # Web search MCP (Node.js)
+│   ├── skills/
+│   │   └── ui-ux-pro-max/      # Bundled UI/UX design intelligence skill
+│   │       ├── SKILL.md         # Skill instructions (auto-loaded by Claude Code)
+│   │       ├── scripts/         # Search engine (BM25 + regex hybrid)
+│   │       └── data/            # Design databases (styles, colors, fonts, etc.)
 │   └── templates/
 │       └── tasklist_template.md
 └── README.md
@@ -117,23 +108,34 @@ claude-OS/
 
 ## MCP Servers
 
-ClaudeOS includes 4 MCP servers for extended capabilities:
+ClaudeOS includes 2 MCP servers for extended capabilities:
 
 | Server | Purpose | Auto-installed |
 |--------|---------|----------------|
 | **Playwright** | Browser automation for web testing | Yes (npx) |
 | **SerpAPI** | Web search via Google | Yes (npm) |
-| **Vision Analyzer** | Screenshot analysis via vision APIs | Yes (pip) |
-| **Computer Control** | Desktop mouse/keyboard control | Yes (pip) |
 
 Dependencies are auto-installed on first run.
+
+## Bundled Skills
+
+ClaudeOS includes the [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) skill, which provides AI-powered design intelligence for web and mobile applications:
+
+- **67 UI styles** (glassmorphism, minimalism, brutalism, etc.)
+- **161 color palettes** by product type
+- **57 font pairings** with Google Fonts imports
+- **99 UX guidelines** with severity ratings
+- **25 chart types** with library recommendations
+- **16 tech stacks** (React, Next.js, Vue, Svelte, etc.)
+
+When the Developer agent builds UI pages, it automatically queries this skill for design system recommendations, color palettes, typography, and stack-specific best practices — ensuring production-quality visual design out of the box.
 
 ## Context Management
 
 Claude Code has a finite context window. ClaudeOS handles this with:
 
 - **Turn counter**: Each agent interaction increments the counter
-- **Proactive restart**: At soft limit (8 turns), restart at next natural breakpoint
+- **Proactive restart**: At soft limit (10 turns), restart immediately via restart_state
 - **Cooperative restart**: Leader saves state → writes `ready` → Orchestrator restarts
 - **Heartbeat monitor**: If log.md goes stale for 40 minutes, force restart
 - **Recovery**: New Leader reads recovery.md and resumes exactly where it left off
