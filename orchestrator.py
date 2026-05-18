@@ -371,11 +371,34 @@ class Orchestrator:
             print(f"  工作区: {self.workspace}")
             print(f"{'='*55}\n")
 
-            updates = {"status": STATUS_RUNNING, "turn": 0, "restart_count": self.restart_count}
-            if is_restart:
-                current = self._read_state()
-                updates["total_sessions"] = current.get("total_sessions", 1) + 1
-            self._write_state(**updates)
+            # Preserve recovery_context from previous cycle before overwriting
+            old_state = self._read_state()
+            recovery = old_state.get("recovery_context")
+
+            new_state = {
+                "status": STATUS_RUNNING,
+                "turn": 0,
+                "restart_count": self.restart_count,
+                "total_sessions": (old_state.get("total_sessions", 1) + 1) if is_restart else old_state.get("total_sessions", 1),
+                "recovery_context": recovery,
+            }
+            # Full overwrite — no read-modify-write race
+            data = json.dumps(new_state, indent=2) + "\n"
+            fd, tmp = tempfile.mkstemp(dir=str(self.os_dir), suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(data)
+                os.replace(tmp, str(self.state_file))
+            except OSError:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+
+            # Verify state.json has correct status
+            verify = self._read_state()
+            print(f"  state.json status: {verify.get('status')}")
+
             self._build_instructions()
             self._start_claude("Read .claude-os/instructions.md and follow all instructions inside.")
 
