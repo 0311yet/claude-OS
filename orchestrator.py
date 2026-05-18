@@ -263,6 +263,9 @@ class Orchestrator:
         kwargs = {"cwd": str(self.workspace)}
         if sys.platform == "win32":
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        # Capture stderr to diagnose crash loops (exit code 1)
+        log_file = self.os_dir / "claude_stderr.log"
+        kwargs["stderr"] = open(log_file, "w", encoding="utf-8")
         with self._lock:
             self.claude_process = subprocess.Popen(cmd, **kwargs)
             self._session_start = time.time()
@@ -386,6 +389,19 @@ class Orchestrator:
             exit_code = self.claude_process.returncode
             print(f"[Orchestrator] Claude 已退出，代码 {exit_code}")
             _reset_windows_console()
+
+            # Show stderr on non-zero exit for diagnostics
+            if exit_code != 0:
+                stderr_log = self.os_dir / "claude_stderr.log"
+                try:
+                    stderr_content = stderr_log.read_text(encoding="utf-8").strip()
+                    if stderr_content:
+                        # Show last 20 lines max
+                        lines = stderr_content.splitlines()
+                        for line in lines[-20:]:
+                            print(f"  [stderr] {line}")
+                except OSError:
+                    pass
 
             state = self._read_state()
             should_restart = (
