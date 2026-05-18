@@ -1,144 +1,86 @@
 # ClaudeOS
 
-Multi-agent development framework powered by Claude Code. Orchestrates a team of AI agents (Leader, Planner, Developer, Tester) to build complete software projects autonomously.
+Claude Code 生命周期管理器。自动启动、监控、重启 Claude Code 会话，支持无人值守的项目开发。
 
-## How It Works
+## 它做什么
 
 ```
-User → Leader → Planner (plan)
-                → Developer (code, parallel)
-                → Tester (test)
+Orchestrator ──启动──▶ Claude Code 会话
+   │                        │
+   ├── 监控 state.json ◀─── 更新状态（turn/status）
+   ├── 超时/心跳检测         │
+   └── 自动重启 ◀─── 会话结束 ─── 恢复上下文
 ```
 
-The **Orchestrator** (Python) manages the Leader's lifecycle — start, monitor, restart on context overflow. The **Leader** (Claude Code) coordinates sub-agents, each spawned as an isolated Claude Code agent with clean context.
+**Orchestrator** 是一个单文件 Python 脚本，负责：
 
-### Workflow Phases
+- 初始化工作区（git、skills、state.json）
+- 启动 Claude Code（`--dangerously-skip-permissions`）
+- 通过 state.json 监控会话状态
+- 超时（1.5h）/ 心跳（40min）/ 异常退出自动重启
+- 重启时通过 recovery_context 恢复上下文
 
-| Phase | Description |
-|-------|-------------|
-| 1. Requirements | Leader gathers requirements from user, confirms tech stack |
-| 2. Planning | Planner creates task breakdown with dependencies |
-| 3. Development | Developers implement tasks in parallel (2-3 concurrent) |
-| 4. Testing | Tester runs automated + manual + browser tests |
-| 5. Delivery | Leader delivers summary to user |
-| 6. Iteration | User requests changes → Developer → Tester loop |
+**Claude Code** 是实际的工作者，负责探索项目、写代码、跑测试。它通过更新 state.json 与 orchestrator 通信。
 
-## Prerequisites
+## 快速开始
 
-- Python 3.10+
-- Node.js + npm
-- Claude Code CLI (`claude`)
-- Git
-
-## Installation
-
-### Quick install (add `cos` to PATH)
-
-Double-click `install.bat` or run in terminal:
+### 一键安装（添加 `cos` 到 PATH）
 
 ```bat
 install.bat
 ```
 
-Then open any folder in Explorer, type `cos` in the address bar to start.
+之后在任意文件夹地址栏输入 `cos` 即可启动。
 
-### Manual usage
+### 手动使用
 
 ```bash
 python orchestrator.py /path/to/project
 ```
 
-## Configuration
+## 前置条件
 
-### API Keys
+- Python 3.10+
+- Claude Code CLI（`claude`）
+- Git
 
-Copy the template and fill in your keys:
+## 状态管理
 
-```bash
-cp config/secrets.example.json config/secrets.json
-```
+Claude Code 通过 `.claude-os/state.json` 与 orchestrator 通信：
 
-Edit `config/secrets.json`:
+| 字段 | 谁写入 | 说明 |
+|------|--------|------|
+| `status` | Claude | `running` / `idle` / `restarting` |
+| `turn` | Claude | 每完成一个重要步骤 +1 |
+| `recovery_context` | Claude | 会话结束前的进度摘要，供下次重启恢复 |
+| `restart_count` | Orchestrator | 当前重启次数 |
+| `total_sessions` | Orchestrator | 总会话数 |
 
-```json
-{
-  "SERPAPI_API_KEY": ""            // Optional: web search
-}
-```
+## 环境变量
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `SERPAPI_API_KEY` | No | SerpAPI for web search MCP |
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `CLAUDEOS_TIMEOUT` | 5400 | 会话超时（秒） |
+| `CLAUDEOS_HEARTBEAT` | 2400 | 心跳超时（秒） |
+| `CLAUDEOS_IDLE_TIMEOUT` | 600 | idle 状态超时（秒） |
 
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CLAUDEOS_TIMEOUT` | 5400 | Leader session timeout (seconds) |
-| `CLAUDEOS_HEARTBEAT` | 2400 | Heartbeat check interval (seconds) |
-
-## Project Structure
+## 项目结构
 
 ```
 claude-OS/
-├── orchestrator.py              # Entry point: setup + start/monitor/restart
-├── cos.cmd                      # Windows Explorer address bar launcher
-├── install.bat                  # One-click PATH setup
-├── requirements.txt             # Python deps (none required at top level)
+├── orchestrator.py              # 入口：初始化 + 启动/监控/重启
+├── status_helper.py             # 标题栏状态显示（后台进程）
+├── cos.cmd                      # Windows 地址栏启动器
+├── install.bat                  # 一键 PATH 安装
 ├── config/
-│   ├── leader.md                # Leader agent instructions
-│   ├── mcp.json                 # MCP server declarations
-│   ├── secrets.json             # API keys (gitignored)
-│   ├── secrets.example.json     # API key template
-│   ├── agents/
-│   │   ├── planner.md           # Task breakdown agent
-│   │   ├── developer.md         # Code implementation agent
-│   │   └── tester.md            # Testing agent
-│   ├── mcp_servers/
-│   │   └── serpapi/             # Web search MCP (Node.js)
-│   ├── skills/
-│   │   └── ui-ux-pro-max/      # Bundled UI/UX design intelligence skill
-│   │       ├── SKILL.md         # Skill instructions (auto-loaded by Claude Code)
-│   │       ├── scripts/         # Search engine (BM25 + regex hybrid)
-│   │       └── data/            # Design databases (styles, colors, fonts, etc.)
-│   └── templates/
-│       └── tasklist_template.md
+│   └── skills/
+│       └── ui-ux-pro-max/      # 内置 UI/UX 设计技能
 └── README.md
 ```
 
-## MCP Servers
+## 内置 Skills
 
-ClaudeOS includes 2 MCP servers for extended capabilities:
-
-| Server | Purpose | Auto-installed |
-|--------|---------|----------------|
-| **Playwright** | Browser automation for web testing | Yes (npx) |
-| **SerpAPI** | Web search via Google | Yes (npm) |
-
-Dependencies are auto-installed on first run.
-
-## Bundled Skills
-
-ClaudeOS includes the [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) skill, which provides AI-powered design intelligence for web and mobile applications:
-
-- **67 UI styles** (glassmorphism, minimalism, brutalism, etc.)
-- **161 color palettes** by product type
-- **57 font pairings** with Google Fonts imports
-- **99 UX guidelines** with severity ratings
-- **25 chart types** with library recommendations
-- **16 tech stacks** (React, Next.js, Vue, Svelte, etc.)
-
-When the Developer agent builds UI pages, it automatically queries this skill for design system recommendations, color palettes, typography, and stack-specific best practices — ensuring production-quality visual design out of the box.
-
-## Context Management
-
-Claude Code has a finite context window. ClaudeOS handles this with:
-
-- **Turn counter**: Each agent interaction increments the counter
-- **Proactive restart**: At soft limit (10 turns), restart immediately via restart_state
-- **Cooperative restart**: Leader saves state → writes `ready` → Orchestrator restarts
-- **Heartbeat monitor**: If log.md goes stale for 40 minutes, force restart
-- **Recovery**: New Leader reads recovery.md and resumes exactly where it left off
+ClaudeOS 内置 [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 技能，在初始化时自动安装到项目的 `.claude/skills/` 目录。Claude Code 会在需要时自动调用，提供设计系统、配色方案、排版等建议。
 
 ## License
 

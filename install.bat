@@ -70,14 +70,4 @@ echo  Or from terminal:
 echo   cos "C:\path\to\project"
 echo.
 
-REM Also copy secrets.example.json to secrets.json if it doesn't exist
-if not exist "%SCRIPT_DIR%\config\secrets.json" (
-    if exist "%SCRIPT_DIR%\config\secrets.example.json" (
-        copy "%SCRIPT_DIR%\config\secrets.example.json" "%SCRIPT_DIR%\config\secrets.json" >nul
-        echo  [Setup] Created config\secrets.json from template.
-        echo         Please edit it and fill in your API keys.
-        echo.
-    )
-)
-
 pause
