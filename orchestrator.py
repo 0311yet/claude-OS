@@ -41,6 +41,7 @@ STATUS_RESTARTING = "restarting"
 GITIGNORE_ENTRIES = [
     ".claude-os/",
     ".claude/settings.json",
+    ".claude/settings.local.json",
     ".claude/CLAUDE.md.bak",
     "node_modules/",
     "__pycache__/",
@@ -224,48 +225,37 @@ class Orchestrator:
                 os.killpg(os.getpgid(self._status_helper.pid), 9)
         self._status_helper = None
 
-    def _build_prompt(self):
+    def _build_instructions(self):
         state = self._read_state()
         recovery = state.get("recovery_context")
         turn = state.get("turn", 0)
 
-        state_instr = (
-            "【重要】状态文件维护（.claude-os/state.json）\n\n"
-            "Turn 计数规则（每轮结束后写入 state.json turn 字段）：\n"
-            "  +1：完成一组工具调用（读文件/搜索/bash/写代码等）\n"
-            "  +1：完成一个完整的任务步骤\n"
-            "  +2：执行了多个并行操作的批次\n"
-            "日志格式：每轮开始时输出 [Turn X/15] {行动}，结束时输出结果摘要。\n\n"
-            "状态更新规则：\n"
-            "  开始任务时 → status = 'running'\n"
-            "  全部工作完成 → 写入 recovery_context，然后退出\n"
-            "  遇到无法解决的阻塞 → status = 'restarting'\n\n"
-            "主动重启（软限 10）：\n"
-            "  达到 10 turn 时，在当前任务的自然断点主动停止，"
-            "  写入 recovery_context（当前进度+下一步），然后退出。\n"
-            "  不要等 orchestrator 强制中断。\n\n"
-            "硬限 15 turn：必须停止，无例外。\n"
-            f"当前 turn：{turn}。\n\n"
-            "更新方法：用 Bash 写入 JSON 文件（python -c 或直接写文件）。\n\n"
-            "不要将 status 设为 'idle'。此会话是无人值守模式，自主运行，无外部用户等待输入。\n"
-            "语言：与用户交流时使用中文。代码、注释、commit message、文档等内容保持英文。\n"
-            "Session 超时：1.5 小时，超时后 orchestrator 会自动重启你。"
-        )
+        template_path = CONFIG_DIR / "cos-instructions.md"
+        try:
+            template = template_path.read_text(encoding="utf-8")
+        except OSError:
+            template = "Read .claude-os/state.json for current state, then start working."
 
         if recovery:
-            return (
-                f"你正在恢复一个 ClaudeOS 会话。当前 turn：{turn}/15（软限 10，硬限 15）。\n"
-                "以下是上次会话的恢复上下文，直接从断点继续，不要重新探索整个项目。\n"
-                "只读取下一步操作必需的文件，然后立刻开始工作。\n\n"
-                f"恢复上下文：\n{recovery}\n\n"
-                f"{state_instr}"
+            header = (
+                f"**RECOVERY SESSION — Turn {turn}/15 (soft limit 10, hard limit 15)**\n\n"
+                "Resume from the breakpoint below. Do NOT re-explore the entire project.\n"
+                "Only read files needed for the immediate next step, then start working.\n\n"
+                f"### Recovery Context\n\n{recovery}"
             )
-        return (
-            "你正在启动一个全新的 ClaudeOS 会话。"
-            "快速概览项目结构（ls + 1-2 个关键文件），然后立刻开始工作。"
-            "不要做全面扫描，边做边了解细节。\n\n"
-            f"{state_instr}"
-        )
+        else:
+            header = (
+                f"**NEW SESSION — Turn {turn}/15 (soft limit 10, hard limit 15)**\n\n"
+                "Quick overview: ls + 1-2 key files, then start working immediately.\n"
+                "Do not do a full scan. Learn details as you go."
+            )
+
+        instructions = template.replace("{session_header}", header)
+        instructions = instructions.replace("{turn_num}", str(turn))
+
+        instructions_path = self.os_dir / "instructions.md"
+        instructions_path.write_text(instructions, encoding="utf-8")
+        return instructions_path
 
     def _start_claude(self, prompt):
         _reset_windows_console()
@@ -377,8 +367,8 @@ class Orchestrator:
                 current = self._read_state()
                 updates["total_sessions"] = current.get("total_sessions", 1) + 1
             self._write_state(**updates)
-            prompt = self._build_prompt()
-            self._start_claude(prompt)
+            self._build_instructions()
+            self._start_claude("读取 .claude-os/instructions.md 并按其中的指令开始工作。")
 
             monitor = threading.Thread(target=self._monitor, daemon=True)
             monitor.start()
