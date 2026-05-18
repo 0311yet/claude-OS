@@ -1,5 +1,7 @@
 # ClaudeOS Session Instructions
 
+**Language: communicate with user in Chinese. Code, comments, commit messages, docs stay in English.**
+
 {session_header}
 
 ## State File Maintenance (.claude-os/state.json)

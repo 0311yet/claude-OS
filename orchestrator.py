@@ -266,9 +266,13 @@ class Orchestrator:
         # Capture stderr to diagnose crash loops (exit code 1)
         log_file = self.os_dir / "claude_stderr.log"
         kwargs["stderr"] = open(log_file, "w", encoding="utf-8")
-        with self._lock:
-            self.claude_process = subprocess.Popen(cmd, **kwargs)
-            self._session_start = time.time()
+        try:
+            with self._lock:
+                self.claude_process = subprocess.Popen(cmd, **kwargs)
+                self._session_start = time.time()
+        except Exception as e:
+            print(f"[Orchestrator] 启动 Claude 失败: {e}")
+            self.claude_process = None
 
     def _stop_claude(self):
         with self._lock:
@@ -371,7 +375,12 @@ class Orchestrator:
                 updates["total_sessions"] = current.get("total_sessions", 1) + 1
             self._write_state(**updates)
             self._build_instructions()
-            self._start_claude("读取 .claude-os/instructions.md 并按其中的指令开始工作。")
+            self._start_claude("Read .claude-os/instructions.md and follow all instructions inside.")
+
+            if self.claude_process is None:
+                print("[Orchestrator] 无法启动 Claude，退出")
+                self.running = False
+                break
 
             monitor = threading.Thread(target=self._monitor, daemon=True)
             monitor.start()
