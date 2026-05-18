@@ -242,19 +242,23 @@ class Orchestrator:
             "此会话是无人值守模式，自主运行，无外部用户等待输入。\n\n"
             "语言：与用户交流时使用中文。代码、注释、commit message、文档等内容保持英文。\n\n"
             f"Turn 限制：软限 10（建议完成），硬限 15（必须停止）。当前 turn：{turn}。\n"
-            "Session 超时：1.5 小时，超时后 orchestrator 会自动重启你。"
+            "Session 超时：1.5 小时，超时后 orchestrator 会自动重启你。\n\n"
+            "效率要求：探索是昂贵的，不要烧 turn 在只读查询上。"
+            "边做边读，每个 turn 都应推进实际工作（写代码/跑命令）。"
         )
 
         if recovery:
             return (
-                f"你正在恢复一个 ClaudeOS 会话（turn {turn}）。"
-                "先阅读项目代码了解当前状态。"
-                f"上一次会话的恢复上下文：\n{recovery}\n\n"
+                f"你正在恢复一个 ClaudeOS 会话（当前 turn {turn}）。"
+                "以下是上次会话的恢复上下文，直接从断点继续，不要重新探索整个项目。\n"
+                "只读取下一步操作必需的文件，然后立刻开始工作。\n\n"
+                f"恢复上下文：\n{recovery}\n\n"
                 f"{state_instr}"
             )
         return (
             "你正在启动一个全新的 ClaudeOS 会话。"
-            "先探索项目，然后开始工作。\n\n"
+            "快速概览项目结构（ls + 1-2 个关键文件），然后立刻开始工作。"
+            "不要做全面扫描，边做边了解细节。\n\n"
             f"{state_instr}"
         )
 
