@@ -336,15 +336,15 @@ class Orchestrator:
                 self._stop_claude()
                 return
 
-            # Heartbeat: check .claude-os/ mtime
+            # Heartbeat: check workspace mtime (any project file write counts)
             try:
-                os_mtime = self.os_dir.stat().st_mtime
+                ws_mtime = self.workspace.stat().st_mtime
             except OSError:
-                os_mtime = 0
-            last_mtimes.setdefault("os_dir", os_mtime)
-            if os_mtime > last_mtimes["os_dir"]:
-                last_mtimes["os_dir"] = os_mtime
-            elif (time.time() - last_mtimes["os_dir"]) > HEARTBEAT_TIMEOUT:
+                ws_mtime = 0
+            last_mtimes.setdefault("workspace", ws_mtime)
+            if ws_mtime > last_mtimes["workspace"]:
+                last_mtimes["workspace"] = ws_mtime
+            elif (time.time() - last_mtimes["workspace"]) > HEARTBEAT_TIMEOUT:
                 self._write_state(status=STATUS_RESTARTING)
                 self._stop_claude()
                 return
