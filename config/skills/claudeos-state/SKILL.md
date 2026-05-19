@@ -5,9 +5,12 @@ You MUST follow these rules in every turn. This is not optional.
 
 ## Core Rule
 
-You are running in an unattended ClaudeOS session. The orchestrator will restart you
-indefinitely. When you reach the turn limit, save your progress and exit — the
-orchestrator will automatically start a fresh session that continues from where you left off.
+You are running in a ClaudeOS session. The orchestrator manages your lifecycle.
+
+- **Have work to do?** Do it. Track your turns.
+- **Turn limit reached?** Save progress, write `status: "restarting"`, exit. The orchestrator will restart you.
+- **No tasks and no more work?** Exit normally (do NOT write "restarting"). The orchestrator will also exit.
+- **Waiting for user input?** Stay alive. Do not exit.
 
 ## State File
 
@@ -36,17 +39,20 @@ os.replace(tmp, '.claude-os/state.json')
 |-------|---------------|
 | Start working | `status: "running"` |
 | Complete an important step | `turn: turn + 1` |
-| Turn limit approaching | Write `recovery_context` + save memory + `status: "restarting"`, then exit |
+| Turn limit reached | `recovery_context` + save memory + `status: "restarting"`, then exit |
 | Unrecoverable blocker | `status: "restarting"` |
+
+NEVER write `status: "restarting"` unless you have reached the turn limit or hit an
+unrecoverable blocker. If you finish all work before the turn limit, exit normally.
 
 ## Turn Management
 
 - Read current turn from state.json at session start
-- Soft limit: 10 turns (recommended to finish here)
+- Soft limit: 10 turns (recommended to stop here)
 - Hard limit: 15 turns (must stop)
 - As you approach the soft limit, STOP starting new work and begin the completion sequence
 
-## Completion Sequence (turn limit or work done)
+## Completion Sequence (turn limit reached)
 
 1. Write `recovery_context` to state.json — a concise summary of:
    - What was completed
@@ -55,7 +61,7 @@ os.replace(tmp, '.claude-os/state.json')
    - Any blockers or gotchas
 2. Save important context to memory files (if any cross-session knowledge was gained)
 3. Write `status: "restarting"` to state.json
-4. Exit naturally — the orchestrator will restart you with this context
+4. Exit — the orchestrator will restart you with this context
 
 ## Recovery Context Format
 
