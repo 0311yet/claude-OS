@@ -36,7 +36,10 @@ os.replace(tmp, '.claude-os/state.json')
 | Start working | `status: "running"` |
 | Complete a step | `turn + 1` |
 | Turn limit reached | `recovery_context` + save memory + `status: "restarting"` → exit |
-| Unrecoverable blocker | `status: "restarting"` → exit |
+| Unrecoverable blocker | `recovery_context` + `status: "restarting"` → exit |
+
+Do NOT write `status: "restarting"` for any other reason. If work is done but turn limit
+hasn't been reached, wait for user input instead of exiting.
 
 ## Turn Limits
 

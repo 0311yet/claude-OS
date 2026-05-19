@@ -160,7 +160,6 @@ class Orchestrator:
         self.running = False
         self.restart_count = 0
         self._lock = threading.Lock()
-        self._session_start = None
         self._status_helper = None
 
     def _read_state(self):
@@ -225,7 +224,8 @@ class Orchestrator:
 
         skill_ref = (
             "遵循 .claude/skills/claudeos-state/SKILL.md 中的状态协议。\n"
-            f"当前 turn：{turn}。这个会话会无限重启，到达 turn 限制时保存状态后退出即可。"
+            f"当前 turn：{turn}。没有活干就等待用户输入，不要主动退出。"
+            "到达 turn 限制时保存状态后退出，orchestrator 会自动重启你。"
         )
 
         if recovery:
@@ -249,7 +249,6 @@ class Orchestrator:
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
         with self._lock:
             self.claude_process = subprocess.Popen(cmd, **kwargs)
-            self._session_start = time.time()
 
     def _stop_claude(self):
         with self._lock:
@@ -283,15 +282,15 @@ class Orchestrator:
                 self._stop_claude()
                 return
 
-            # Heartbeat: check .claude-os/ mtime
+            # Heartbeat: check workspace mtime (any file write counts as activity)
             try:
-                os_mtime = self.os_dir.stat().st_mtime
+                ws_mtime = self.workspace.stat().st_mtime
             except OSError:
-                os_mtime = 0
-            last_mtimes.setdefault("os_dir", os_mtime)
-            if os_mtime > last_mtimes["os_dir"]:
-                last_mtimes["os_dir"] = os_mtime
-            elif (time.time() - last_mtimes["os_dir"]) > HEARTBEAT_TIMEOUT:
+                ws_mtime = 0
+            last_mtimes.setdefault("workspace", ws_mtime)
+            if ws_mtime > last_mtimes["workspace"]:
+                last_mtimes["workspace"] = ws_mtime
+            elif (time.time() - last_mtimes["workspace"]) > HEARTBEAT_TIMEOUT:
                 self._write_state(status=STATUS_RESTARTING)
                 self._stop_claude()
                 return
