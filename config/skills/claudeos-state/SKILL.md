@@ -1,33 +1,29 @@
 # ClaudeOS State Protocol
 
-This is a MANDATORY behavioral protocol for sessions launched by ClaudeOS.
-You MUST follow these rules in every turn. This is not optional.
+MANDATORY. You MUST follow these rules. This is not optional.
 
-## Core Rule
+## The One Rule
 
-You are running in a ClaudeOS session. The orchestrator manages your lifecycle.
+**Never exit on your own. Only the user (Ctrl+C) can stop you.**
 
-- **Have work to do?** Do it. Track your turns.
-- **Turn limit reached?** Save progress, write `status: "restarting"`, exit. The orchestrator will restart you.
-- **No tasks and no more work?** Exit normally (do NOT write "restarting"). The orchestrator will also exit.
-- **Waiting for user input?** Stay alive. Do not exit.
+- Have work → do it, track turns
+- Turn limit reached → save progress, write `status: "restarting"`, exit (orchestrator will restart you)
+- Work finished, no more tasks → wait for user input. Do NOT exit.
+- Nothing to do → wait for user input. Do NOT exit.
 
 ## State File
 
 Path: `.claude-os/state.json`
 
-Read this file at the start of each significant action to know your current turn.
+Read at session start to know your current turn.
 
 ## When to Update
 
-Write the FULL JSON (read → modify → write to tmp file → atomic replace) via Bash:
+Write FULL JSON via Bash (read → modify → tmp file → atomic replace):
 
 ```
-# Read, update, and atomically replace:
 python -c "
-import json
-s = json.load(open('.claude-os/state.json'))
-s['field'] = value
+import json; s = json.load(open('.claude-os/state.json')); s['field'] = value
 import tempfile, os
 fd, tmp = tempfile.mkstemp(dir='.claude-os', suffix='.tmp')
 with os.fdopen(fd, 'w') as f: json.dump(s, f, indent=2)
@@ -35,42 +31,33 @@ os.replace(tmp, '.claude-os/state.json')
 "
 ```
 
-| Event | What to write |
-|-------|---------------|
+| Event | Action |
+|-------|--------|
 | Start working | `status: "running"` |
-| Complete an important step | `turn: turn + 1` |
-| Turn limit reached | `recovery_context` + save memory + `status: "restarting"`, then exit |
-| Unrecoverable blocker | `status: "restarting"` |
+| Complete a step | `turn + 1` |
+| Turn limit reached | `recovery_context` + save memory + `status: "restarting"` → exit |
+| Unrecoverable blocker | `status: "restarting"` → exit |
 
-NEVER write `status: "restarting"` unless you have reached the turn limit or hit an
-unrecoverable blocker. If you finish all work before the turn limit, exit normally.
+## Turn Limits
 
-## Turn Management
+- Soft: 10 (stop starting new work, begin saving)
+- Hard: 15 (must exit)
+- At soft limit: finish current step → save → write `restarting` → exit
+- Do NOT exit before turn limit unless blocked
 
-- Read current turn from state.json at session start
-- Soft limit: 10 turns (recommended to stop here)
-- Hard limit: 15 turns (must stop)
-- As you approach the soft limit, STOP starting new work and begin the completion sequence
+## What "restarting" Means
 
-## Completion Sequence (turn limit reached)
+`status: "restarting"` tells the orchestrator: "I hit the turn limit, restart me with fresh context."
+Only write it when exiting due to turn limit or blocker.
 
-1. Write `recovery_context` to state.json — a concise summary of:
-   - What was completed
-   - What the current state is
-   - What should happen next
-   - Any blockers or gotchas
-2. Save important context to memory files (if any cross-session knowledge was gained)
-3. Write `status: "restarting"` to state.json
-4. Exit — the orchestrator will restart you with this context
+## Recovery Context
 
-## Recovery Context Format
-
-Keep it under 500 words. Factual, not narrative. Example:
+Before exiting at turn limit, write `recovery_context` (under 500 words):
 ```
-"Completed: user auth module (JWT + bcrypt). Files: src/auth/*. Current: API routes working locally. Next: add refresh token rotation. Blocker: none. Note: .env needs JWT_SECRET set in production."
+"Completed: X. Files: Y. Current state: Z. Next: W. Blockers: none."
 ```
 
 ## Language
 
-- Talk to user: Chinese
-- Code, comments, commits, docs: English
+- User communication: Chinese
+- Code, comments, commits: English

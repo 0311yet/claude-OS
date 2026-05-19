@@ -334,15 +334,10 @@ class Orchestrator:
             print(f"[Orchestrator] Claude 已退出，代码 {exit_code}")
             _reset_windows_console()
 
-            state = self._read_state()
-            if state.get("status") == STATUS_RESTARTING or exit_code != 0:
-                self.restart_count += 1
-                delay = min(2 * (2 ** (self.restart_count - 1)), 30)
-                print(f"[Orchestrator] 第 {self.restart_count} 次重启，{delay}秒后...")
-                time.sleep(delay)
-            else:
-                print("[Orchestrator] Claude 正常结束，无待办任务。")
-                self.running = False
+            self.restart_count += 1
+            delay = min(2 * (2 ** (self.restart_count - 1)), 30)
+            print(f"[Orchestrator] 第 {self.restart_count} 次重启，{delay}秒后...")
+            time.sleep(delay)
 
         self._stop_status_helper()
         print("\n[Orchestrator] 会话已结束。")
