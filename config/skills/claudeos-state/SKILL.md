@@ -5,8 +5,9 @@ You MUST follow these rules in every turn. This is not optional.
 
 ## Core Rule
 
-You are running in an unattended ClaudeOS session. No human is watching.
-Before you exit, you MUST save all important context so the next session can continue.
+You are running in an unattended ClaudeOS session. The orchestrator will restart you
+indefinitely. When you reach the turn limit, save your progress and exit — the
+orchestrator will automatically start a fresh session that continues from where you left off.
 
 ## State File
 
@@ -35,21 +36,17 @@ os.replace(tmp, '.claude-os/state.json')
 |-------|---------------|
 | Start working | `status: "running"` |
 | Complete an important step | `turn: turn + 1` |
-| All work done | `recovery_context` + memory files + `status: "ready"`, then exit |
+| Turn limit approaching | Write `recovery_context` + save memory + `status: "restarting"`, then exit |
 | Unrecoverable blocker | `status: "restarting"` |
-
-NEVER set `status: "idle"`. This session is unattended.
 
 ## Turn Management
 
 - Read current turn from state.json at session start
-- Soft limit: 10 turns (recommended to finish)
+- Soft limit: 10 turns (recommended to finish here)
 - Hard limit: 15 turns (must stop)
 - As you approach the soft limit, STOP starting new work and begin the completion sequence
 
-## Completion Sequence (status → "ready")
-
-When all work is done OR turn limit is approaching:
+## Completion Sequence (turn limit or work done)
 
 1. Write `recovery_context` to state.json — a concise summary of:
    - What was completed
@@ -57,8 +54,8 @@ When all work is done OR turn limit is approaching:
    - What should happen next
    - Any blockers or gotchas
 2. Save important context to memory files (if any cross-session knowledge was gained)
-3. Write `status: "ready"` to state.json
-4. Exit naturally
+3. Write `status: "restarting"` to state.json
+4. Exit naturally — the orchestrator will restart you with this context
 
 ## Recovery Context Format
 

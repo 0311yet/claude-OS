@@ -26,14 +26,11 @@ except ImportError:
 CONFIG_DIR = Path(__file__).parent / "config"
 
 # Session parameters
-SESSION_TIMEOUT_SECONDS = int(os.environ.get("CLAUDEOS_TIMEOUT", "5400"))
 HEARTBEAT_TIMEOUT = int(os.environ.get("CLAUDEOS_HEARTBEAT", "2400"))
-MAX_RESTARTS = 8
 POLL_INTERVAL = 10
 
 # State file values
 STATUS_RUNNING = "running"
-STATUS_READY = "ready"
 STATUS_RESTARTING = "restarting"
 
 GITIGNORE_ENTRIES = [
@@ -163,10 +160,8 @@ class Orchestrator:
         self.running = False
         self.restart_count = 0
         self._lock = threading.Lock()
-        self._system_start = None
         self._session_start = None
         self._status_helper = None
-        self._completed_normally = False
 
     def _read_state(self):
         try:
@@ -230,7 +225,7 @@ class Orchestrator:
 
         skill_ref = (
             "遵循 .claude/skills/claudeos-state/SKILL.md 中的状态协议。\n"
-            f"当前 turn：{turn}。"
+            f"当前 turn：{turn}。这个会话会无限重启，到达 turn 限制时保存状态后退出即可。"
         )
 
         if recovery:
@@ -288,20 +283,6 @@ class Orchestrator:
                 self._stop_claude()
                 return
 
-            if status == STATUS_READY:
-                print("[Orchestrator] Claude 已就绪，正常结束")
-                self._completed_normally = True
-                self._stop_claude()
-                return
-
-            # Session timeout
-            with self._lock:
-                session_start = self._session_start
-            if session_start and (time.time() - session_start) >= SESSION_TIMEOUT_SECONDS:
-                self._write_state(status=STATUS_RESTARTING)
-                self._stop_claude()
-                return
-
             # Heartbeat: check .claude-os/ mtime
             try:
                 os_mtime = self.os_dir.stat().st_mtime
@@ -319,10 +300,9 @@ class Orchestrator:
 
     def run(self):
         self.running = True
-        self._system_start = time.time()
         self._start_status_helper()
 
-        while self.running and self.restart_count < MAX_RESTARTS:
+        while self.running:
             is_restart = self.restart_count > 0
             print(f"\n{'='*55}")
             print(f"  ClaudeOS{' — 已重启' if is_restart else ''}")
@@ -354,20 +334,10 @@ class Orchestrator:
             print(f"[Orchestrator] Claude 已退出，代码 {exit_code}")
             _reset_windows_console()
 
-            state = self._read_state()
-            should_restart = (
-                not self._completed_normally
-                and (state.get("status") == STATUS_RESTARTING or exit_code != 0)
-            )
-            self._completed_normally = False
-
-            if should_restart:
-                self.restart_count += 1
-                delay = min(2 * (2 ** (self.restart_count - 1)), 30)
-                print(f"[Orchestrator] 第 {self.restart_count}/{MAX_RESTARTS} 次重启，{delay}秒后...")
-                time.sleep(delay)
-            else:
-                self.running = False
+            self.restart_count += 1
+            delay = min(2 * (2 ** (self.restart_count - 1)), 30)
+            print(f"[Orchestrator] 第 {self.restart_count} 次重启，{delay}秒后...")
+            time.sleep(delay)
 
         self._stop_status_helper()
         print("\n[Orchestrator] 会话已结束。")
