@@ -1,40 +1,29 @@
 # ClaudeOS
 
-Claude Code 生命周期管理器。自动启动、监控、重启 Claude Code 会话，支持无人值守的项目开发。
+Claude Code 生命周期管理器。让 Claude Code 在无人值守环境下自主运行，自动处理会话管理、崩溃恢复和跨会话状态持久化。
 
-## 它做什么
+## 工作原理
 
 ```
-Orchestrator ──启动──▶ Claude Code 会话
-   │                        │
-   ├── 监控 state.json ◀─── 更新状态（turn/status）
-   ├── 超时/心跳检测         │
-   └── 自动重启 ◀─── 会话结束 ─── 恢复上下文
+cos / python orchestrator.py [workspace]
+│
+├─ orchestrator.py    启动 Claude → 监控 state.json → 自动重启
+├─ status_helper.py   Terminal title bar 显示运行状态
+└─ config/skills/     状态协议 + UI/UX skill，自动安装到 .claude/skills/
 ```
 
-**Orchestrator** 是一个单文件 Python 脚本，负责：
-
-- 初始化工作区（git、skills、state.json）
-- 启动 Claude Code（`--dangerously-skip-permissions`）
-- 通过 state.json 监控会话状态
-- 超时（1.5h）/ 心跳（40min）/ 异常退出自动重启
-- 重启时通过 recovery_context 恢复上下文
-
-**Claude Code** 是实际的工作者，负责探索项目、写代码、跑测试。它通过更新 state.json 与 orchestrator 通信。
+Orchestrator 启动 Claude Code 子进程，通过 `state.json` 文件协议监控会话状态。Claude 完成工作后写 `status: "ready"` 正常退出；超时或崩溃时自动重启，通过 `recovery_context` 恢复上下文。
 
 ## 快速开始
 
-### 一键安装（添加 `cos` 到 PATH）
-
-```bat
-install.bat
-```
-
-之后在任意文件夹地址栏输入 `cos` 即可启动。
-
-### 手动使用
-
 ```bash
+# 安装 cos 命令到 PATH
+install.bat
+
+# 在任意项目目录启动
+cos
+
+# 或直接运行
 python orchestrator.py /path/to/project
 ```
 
@@ -44,43 +33,38 @@ python orchestrator.py /path/to/project
 - Claude Code CLI（`claude`）
 - Git
 
-## 状态管理
+## 状态协议
 
-Claude Code 通过 `.claude-os/state.json` 与 orchestrator 通信：
+Claude 通过 `.claude-os/state.json` 与 Orchestrator 通信：
 
-| 字段 | 谁写入 | 说明 |
-|------|--------|------|
-| `status` | Claude | `running` / `idle` / `restarting` |
-| `turn` | Claude | 每完成一个重要步骤 +1 |
-| `recovery_context` | Claude | 会话结束前的进度摘要，供下次重启恢复 |
-| `restart_count` | Orchestrator | 当前重启次数 |
-| `total_sessions` | Orchestrator | 总会话数 |
+| 状态 | 谁写 | 含义 |
+|------|------|------|
+| `running` | Orchestrator / Claude | 正在工作 |
+| `ready` | Claude | 工作完成，记忆已保存 |
+| `restarting` | Orchestrator / Claude | 遇到阻塞，需要重启 |
+
+状态协议的完整规则在 `config/skills/claudeos-state/SKILL.md`，Orchestrator 启动时自动安装到项目的 `.claude/skills/` 目录。
 
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `CLAUDEOS_TIMEOUT` | 5400 | 会话超时（秒） |
-| `CLAUDEOS_HEARTBEAT` | 2400 | 心跳超时（秒） |
-| `CLAUDEOS_IDLE_TIMEOUT` | 600 | idle 状态超时（秒） |
+| `CLAUDEOS_TIMEOUT` | 5400 | 会话超时，秒（1.5h） |
+| `CLAUDEOS_HEARTBEAT` | 2400 | 心跳超时，秒（40min） |
 
 ## 项目结构
 
 ```
 claude-OS/
-├── orchestrator.py              # 入口：初始化 + 启动/监控/重启
-├── status_helper.py             # 标题栏状态显示（后台进程）
-├── cos.cmd                      # Windows 地址栏启动器
-├── install.bat                  # 一键 PATH 安装
-├── config/
-│   └── skills/
-│       └── ui-ux-pro-max/      # 内置 UI/UX 设计技能
+├── orchestrator.py                    # 核心管理器
+├── status_helper.py                   # Title bar 状态显示
+├── cos.cmd                            # Windows 地址栏启动器
+├── install.bat                        # PATH 安装
+├── config/skills/
+│   ├── claudeos-state/                # 状态协议 skill
+│   └── ui-ux-pro-max/                # UI/UX 设计 skill
 └── README.md
 ```
-
-## 内置 Skills
-
-ClaudeOS 内置 [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 技能，在初始化时自动安装到项目的 `.claude/skills/` 目录。Claude Code 会在需要时自动调用，提供设计系统、配色方案、排版等建议。
 
 ## License
 

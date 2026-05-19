@@ -1,10 +1,14 @@
-# Auto-managed by ClaudeOS — safe to add your own entries below
-.claude-os/restart_state
-.claude-os/recovery.md
-.claude-os/log.md
-.claude/CLAUDE.md.bak
+# ClaudeOS runtime
+.claude-os/
 .claude/settings.json
-config/secrets.json
-node_modules/
+.claude/CLAUDE.md.bak
+
+# Python
 __pycache__/
+*.pyc
+
+# Environment
 .env
+
+# Dependencies
+node_modules/

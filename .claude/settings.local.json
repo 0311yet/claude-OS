@@ -1,27 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \"import orchestrator; print\\('Import OK'\\)\")",
-      "Bash(npx --version)",
       "Bash(python3 *)",
-      "Bash(claude mcp *)",
-      "Bash(xargs grep *)",
-      "Bash(xargs cat *)",
-      "Bash(reg query *)",
-      "Bash(env)",
-      "Bash(where claude *)",
-      "Bash(npm list *)",
-      "Bash(npm config *)",
-      "WebSearch",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('orchestrator.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
-      "Bash(python -c \"import json; json.load\\(open\\('config/mcp.json'\\)\\); print\\('mcp.json: OK'\\)\")",
-      "Bash(python -c \"import json; json.load\\(open\\('config/secrets.example.json'\\)\\); print\\('secrets.example.json: OK'\\)\")",
-      "Bash(ls -la .claude-os/)",
-      "Bash(ls -la Project/)",
-      "Bash(ls -la .claude/)",
-      "Bash(ls config/mcp_servers/)",
-      "Bash(ls config/skills/)",
-      "Bash(git add *)"
+      "Bash(ls *)",
+      "Bash(git *)",
+      "WebSearch"
     ]
   }
 }

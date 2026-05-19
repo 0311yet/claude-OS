@@ -28,24 +28,22 @@ CONFIG_DIR = Path(__file__).parent / "config"
 # Session parameters
 SESSION_TIMEOUT_SECONDS = int(os.environ.get("CLAUDEOS_TIMEOUT", "5400"))
 HEARTBEAT_TIMEOUT = int(os.environ.get("CLAUDEOS_HEARTBEAT", "2400"))
-IDLE_TIMEOUT = int(os.environ.get("CLAUDEOS_IDLE_TIMEOUT", "600"))
 MAX_RESTARTS = 8
 POLL_INTERVAL = 10
-POLL_INTERVAL_IDLE = 30
 
 # State file values
 STATUS_RUNNING = "running"
-STATUS_IDLE = "idle"
+STATUS_READY = "ready"
 STATUS_RESTARTING = "restarting"
 
 GITIGNORE_ENTRIES = [
     ".claude-os/",
     ".claude/settings.json",
-    ".claude/settings.local.json",
     ".claude/CLAUDE.md.bak",
-    "node_modules/",
     "__pycache__/",
+    "*.pyc",
     ".env",
+    "node_modules/",
 ]
 
 
@@ -225,37 +223,28 @@ class Orchestrator:
                 os.killpg(os.getpgid(self._status_helper.pid), 9)
         self._status_helper = None
 
-    def _build_instructions(self):
+    def _build_prompt(self):
         state = self._read_state()
         recovery = state.get("recovery_context")
         turn = state.get("turn", 0)
 
-        template_path = CONFIG_DIR / "cos-instructions.md"
-        try:
-            template = template_path.read_text(encoding="utf-8")
-        except OSError:
-            template = "Read .claude-os/state.json for current state, then start working."
+        skill_ref = (
+            "遵循 .claude/skills/claudeos-state/SKILL.md 中的状态协议。\n"
+            f"当前 turn：{turn}。"
+        )
 
         if recovery:
-            header = (
-                f"**RECOVERY SESSION — Turn {turn}/15 (soft limit 10, hard limit 15)**\n\n"
-                "Resume from the breakpoint below. Do NOT re-explore the entire project.\n"
-                "Only read files needed for the immediate next step, then start working.\n\n"
-                f"### Recovery Context\n\n{recovery}"
+            return (
+                f"你正在恢复一个 ClaudeOS 会话（turn {turn}）。"
+                "直接从断点继续工作，只读下一步必需的文件，不要全面扫描。"
+                f"上一次会话的恢复上下文：\n{recovery}\n\n"
+                f"{skill_ref}"
             )
-        else:
-            header = (
-                f"**NEW SESSION — Turn {turn}/15 (soft limit 10, hard limit 15)**\n\n"
-                "Quick overview: ls + 1-2 key files, then start working immediately.\n"
-                "Do not do a full scan. Learn details as you go."
-            )
-
-        instructions = template.replace("{session_header}", header)
-        instructions = instructions.replace("{turn_num}", str(turn))
-
-        instructions_path = self.os_dir / "instructions.md"
-        instructions_path.write_text(instructions, encoding="utf-8")
-        return instructions_path
+        return (
+            "你正在启动一个全新的 ClaudeOS 会话。"
+            "快速概览项目（ls + 1-2 个关键文件），边做边了解细节。\n\n"
+            f"{skill_ref}"
+        )
 
     def _start_claude(self, prompt):
         _reset_windows_console()
@@ -263,18 +252,9 @@ class Orchestrator:
         kwargs = {"cwd": str(self.workspace)}
         if sys.platform == "win32":
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-        # Capture stdout+stderr to diagnose crash loops (exit code 1)
-        log_file = self.os_dir / "claude_output.log"
-        log_fh = open(log_file, "w", encoding="utf-8")
-        kwargs["stdout"] = log_fh
-        kwargs["stderr"] = subprocess.STDOUT
-        try:
-            with self._lock:
-                self.claude_process = subprocess.Popen(cmd, **kwargs)
-                self._session_start = time.time()
-        except Exception as e:
-            print(f"[Orchestrator] 启动 Claude 失败: {e}")
-            self.claude_process = None
+        with self._lock:
+            self.claude_process = subprocess.Popen(cmd, **kwargs)
+            self._session_start = time.time()
 
     def _stop_claude(self):
         with self._lock:
@@ -294,8 +274,6 @@ class Orchestrator:
 
     def _monitor(self):
         last_mtimes = {}
-        idle_since = None
-        last_state_mtime = None
 
         while self.running:
             with self._lock:
@@ -306,35 +284,15 @@ class Orchestrator:
             state = self._read_state()
             status = state.get("status", STATUS_RUNNING)
 
-            # Track state.json mtime to detect updates
-            try:
-                current_state_mtime = self.state_file.stat().st_mtime
-            except OSError:
-                current_state_mtime = 0
-
             if status == STATUS_RESTARTING:
                 self._stop_claude()
                 return
 
-            if status == STATUS_IDLE:
-                # Claude wrote idle — likely task done or waiting for input
-                # If state.json was recently updated (Claude still writing), give it time
-                if last_state_mtime is not None and current_state_mtime > last_state_mtime:
-                    idle_since = time.time()  # Reset idle timer on state update
-                    last_state_mtime = current_state_mtime
-                elif idle_since is None:
-                    idle_since = time.time()
-                elif (time.time() - idle_since) > IDLE_TIMEOUT:
-                    print(f"[Orchestrator] idle 超过 {IDLE_TIMEOUT}s，视为任务完成，退出")
-                    self._completed_normally = True
-                    self._stop_claude()
-                    return
-                time.sleep(POLL_INTERVAL_IDLE)
-                continue
-
-            # Reset idle tracking when status is running
-            idle_since = None
-            last_state_mtime = current_state_mtime
+            if status == STATUS_READY:
+                print("[Orchestrator] Claude 已就绪，正常结束")
+                self._completed_normally = True
+                self._stop_claude()
+                return
 
             # Session timeout
             with self._lock:
@@ -344,15 +302,15 @@ class Orchestrator:
                 self._stop_claude()
                 return
 
-            # Heartbeat: check workspace mtime (any project file write counts)
+            # Heartbeat: check .claude-os/ mtime
             try:
-                ws_mtime = self.workspace.stat().st_mtime
+                os_mtime = self.os_dir.stat().st_mtime
             except OSError:
-                ws_mtime = 0
-            last_mtimes.setdefault("workspace", ws_mtime)
-            if ws_mtime > last_mtimes["workspace"]:
-                last_mtimes["workspace"] = ws_mtime
-            elif (time.time() - last_mtimes["workspace"]) > HEARTBEAT_TIMEOUT:
+                os_mtime = 0
+            last_mtimes.setdefault("os_dir", os_mtime)
+            if os_mtime > last_mtimes["os_dir"]:
+                last_mtimes["os_dir"] = os_mtime
+            elif (time.time() - last_mtimes["os_dir"]) > HEARTBEAT_TIMEOUT:
                 self._write_state(status=STATUS_RESTARTING)
                 self._stop_claude()
                 return
@@ -371,41 +329,13 @@ class Orchestrator:
             print(f"  工作区: {self.workspace}")
             print(f"{'='*55}\n")
 
-            # Preserve recovery_context from previous cycle before overwriting
-            old_state = self._read_state()
-            recovery = old_state.get("recovery_context")
-
-            new_state = {
-                "status": STATUS_RUNNING,
-                "turn": 0,
-                "restart_count": self.restart_count,
-                "total_sessions": (old_state.get("total_sessions", 1) + 1) if is_restart else old_state.get("total_sessions", 1),
-                "recovery_context": recovery,
-            }
-            # Full overwrite — no read-modify-write race
-            data = json.dumps(new_state, indent=2) + "\n"
-            fd, tmp = tempfile.mkstemp(dir=str(self.os_dir), suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    f.write(data)
-                os.replace(tmp, str(self.state_file))
-            except OSError:
-                try:
-                    os.unlink(tmp)
-                except OSError:
-                    pass
-
-            # Verify state.json has correct status
-            verify = self._read_state()
-            print(f"  state.json status: {verify.get('status')}")
-
-            self._build_instructions()
-            self._start_claude("Read .claude-os/instructions.md and follow all instructions inside.")
-
-            if self.claude_process is None:
-                print("[Orchestrator] 无法启动 Claude，退出")
-                self.running = False
-                break
+            updates = {"status": STATUS_RUNNING, "turn": 0, "restart_count": self.restart_count}
+            if is_restart:
+                current = self._read_state()
+                updates["total_sessions"] = current.get("total_sessions", 1) + 1
+            self._write_state(**updates)
+            prompt = self._build_prompt()
+            self._start_claude(prompt)
 
             monitor = threading.Thread(target=self._monitor, daemon=True)
             monitor.start()
@@ -423,19 +353,6 @@ class Orchestrator:
             exit_code = self.claude_process.returncode
             print(f"[Orchestrator] Claude 已退出，代码 {exit_code}")
             _reset_windows_console()
-
-            # Show output log on non-zero exit for diagnostics
-            if exit_code != 0:
-                output_log = self.os_dir / "claude_output.log"
-                try:
-                    content = output_log.read_text(encoding="utf-8").strip()
-                    if content:
-                        for line in content.splitlines()[-20:]:
-                            print(f"  [log] {line}")
-                    else:
-                        print("  [log] (empty)")
-                except OSError:
-                    pass
 
             state = self._read_state()
             should_restart = (

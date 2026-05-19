@@ -1,2 +1,0 @@
-# ClaudeOS - Multi-Agent Development Framework
-# No external dependencies required — uses Claude Code CLI
